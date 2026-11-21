@@ -10,8 +10,13 @@ const AGL_API_URL = 'https://script.google.com/macros/s/AKfycbz4TFGZ7e99ft1u361L
 
   // POST tanpa header khusus -> "simple request", tidak kena preflight CORS Apps Script
   function raw(fn, args, pin) {
+    if (AGL_API_URL.indexOf('https://script.google.com/') !== 0) return Promise.reject(new Error('URL API di api.js belum benar. Harus diawali https://script.google.com/ dan berakhiran /exec.'));
     return fetch(AGL_API_URL, { method: 'POST', body: JSON.stringify({ fn: fn, args: args, pin: pin }) })
-      .then(function (r) { return r.json(); });
+      .catch(function () { throw new Error('Permintaan diblokir/gagal. Cek deployment Apps Script: akses harus "Anyone" (bukan "Anyone with Google account").'); })
+      .then(function (r) { return r.text().then(function (x) {
+        try { return JSON.parse(x); }
+        catch (e) { throw new Error('Server tidak membalas JSON (HTTP ' + r.status + '). Pastikan Api.gs sudah ditambahkan dan deployment dibuat sebagai Versi baru.'); }
+      }); });
   }
 
   function login(note) {
@@ -23,7 +28,7 @@ const AGL_API_URL = 'https://script.google.com/macros/s/AKfycbz4TFGZ7e99ft1u361L
         + '<h2 style="margin:0 0 4px;font-size:18px">AGL Dashboard</h2>'
         + '<p style="margin:0 0 14px;font-size:14px;color:var(--mu,#7b6d62)">Masukkan kata sandi untuk membuka dashboard.</p>'
         + '<input id="aglpw" type="password" autocomplete="current-password" style="width:100%;box-sizing:border-box;padding:11px;border-radius:10px;border:1px solid var(--line2,#d2c1ac);background:var(--field,#f6efe5);color:inherit;font-size:16px">'
-        + '<label style="display:flex;gap:8px;align-items:center;margin:12px 0;font-size:13px"><input id="aglrm" type="checkbox"> Ingat di perangkat ini</label>'
+        + '<label style="display:flex;flex-direction:row;justify-content:flex-start;align-items:center;gap:8px;width:auto;margin:12px 0;font-size:13px;cursor:pointer"><input id="aglrm" type="checkbox" style="flex:none;width:18px;height:18px;min-width:0;margin:0;padding:0"><span style="flex:0 1 auto;text-align:left">Ingat di perangkat ini</span></label>'
         + '<button id="aglgo" style="width:100%;padding:11px;border:0;border-radius:10px;background:var(--acc,#b8584a);color:#fff;font-size:15px;cursor:pointer">Masuk</button>'
         + '<p id="aglmsg" style="margin:10px 0 0;font-size:13px;color:var(--dn,#bd3f3a);min-height:16px"></p></div>';
       document.body.appendChild(o);
@@ -38,7 +43,7 @@ const AGL_API_URL = 'https://script.google.com/macros/s/AKfycbz4TFGZ7e99ft1u361L
             try { sessionStorage.setItem(KEY, p); if (o.querySelector('#aglrm').checked) localStorage.setItem(LS, p); } catch (e) {}
             o.remove(); loginP = null; done();
           } else { msg.textContent = (v && v.pesan) || (r && r.error) || 'Gagal masuk.'; go.disabled = false; }
-        }).catch(function () { msg.textContent = 'Tidak bisa terhubung ke server.'; go.disabled = false; });
+        }).catch(function (e) { msg.textContent = (e && e.message) || 'Tidak bisa terhubung ke server.'; go.disabled = false; });
       }
       go.onclick = submit; pw.onkeydown = function (e) { if (e.key === 'Enter') submit(); };
     });
