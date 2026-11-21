@@ -120,10 +120,19 @@ tr.er{cursor:pointer}.epen{color:var(--acc);margin-right:6px;font-size:12px}
 .dng{color:var(--dn);border-color:var(--dn)}#edmsg{margin-top:10px}#edfoot{margin-top:12px}
 #edtoast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 20px);transform:translate(-50%,20px);opacity:0;pointer-events:none;background:var(--text);color:var(--bg);padding:10px 16px;border-radius:99px;font-size:13px;z-index:90;transition:.2s}#edtoast.show{opacity:1;transform:translate(-50%,0)}
 .tabs{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 12px}.tabs button{border-radius:99px;padding:6px 16px;box-shadow:none}.tabs button.on{background:var(--acc);color:var(--selt);border-color:var(--acc);font-weight:600}
+#splash{position:fixed;inset:0;z-index:9000;display:flex;align-items:center;justify-content:center;padding:24px;background:var(--bg);transition:opacity .35s}#splash.out{opacity:0;pointer-events:none}#splash .sp{width:100%;max-width:280px;text-align:center}#splash img{display:block;height:64px;width:auto;max-width:100%;margin:0 auto 26px;padding:10px 16px;background:var(--sblogo,transparent);border-radius:18px}#splash .spt{height:8px;border-radius:99px;background:var(--track);overflow:hidden}#splash .spt b{display:block;height:100%;width:4%;border-radius:99px;background:var(--acc);transition:width .3s ease-out}#splash .sx{margin-top:12px;font-size:13px;color:var(--mu);min-height:18px}#splash button{margin-top:14px;padding:9px 18px;border:0;border-radius:10px;background:var(--acc);color:var(--selt,#fff);font:inherit;font-size:14px;cursor:pointer}
 </style>
 <script>try{if(localStorage.getItem("agl-theme")==="dark")document.documentElement.setAttribute("data-theme","dark")}catch(e){}</script>
 </head>
 <body>
+<div id="splash" role="status" aria-live="polite"><div class="sp"><img alt="AGL Dashboard"><div class="spt" role="progressbar" aria-valuemin="0" aria-valuemax="100"><b id="spb"></b></div><div class="sx" id="spx">Memuat data…</div></div></div>
+<script>
+(function(){var el=document.getElementById('splash'),bar=document.getElementById('spb'),tx=document.getElementById('spx'),p=4,done=false,n=0,iv;
+document.addEventListener('DOMContentLoaded',function(){var lg=document.getElementById('lg1');if(lg)el.querySelector('img').src=lg.src});
+iv=setInterval(function(){if(done||document.getElementById('aglpw'))return;n++;p+=(92-p)*0.05;bar.style.width=p+'%';if(n===130)tx.textContent='Masih memuat, koneksi mungkin lambat…'},150);
+window.aglSplashDone=function(){if(done)return;done=true;clearInterval(iv);bar.style.width='100%';setTimeout(function(){el.classList.add('out');setTimeout(function(){el.remove()},400)},250)};
+window.aglSplashFail=function(m){if(done)return;clearInterval(iv);bar.style.background='var(--dn)';tx.textContent=m;if(!el.querySelector('button')){var b=document.createElement('button');b.textContent='Coba lagi';b.onclick=function(){location.reload()};el.querySelector('.sp').appendChild(b)}}})();
+</script>
 <div id="scrim"></div>
 <nav id="drawer" aria-label="Menu">
   <a href="#ringkasan" data-p="ringkasan" data-ic="dash">Ringkasan</a>
@@ -340,7 +349,7 @@ function msg(t,b){const s=$('status');s.className='show';s.textContent=t;if(b){c
 const ok=()=>{$('status').className=''};
 function stamp(r){const t=r&&r.cache&&r.cache.storedAt?new Date(r.cache.storedAt):new Date();$('upd').textContent='Diperbarui '+t.toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'})+' · sumber: Google Sheets “Rekap AGL Gedung Jaya”'}
 function apply(k,res){const v=rows(res),s=JSON.stringify(v);stamp(res);ok();if(sig[k]===s&&ld[k])return;sig[k]=s;({fin:setFin,ord:setOrd,non:setNon})[k](v);if(!uP){const m=FIN.concat(ORD).map(x=>x.d.k);if(m.length){P.s=kiso(Math.min(...m));$('pt').textContent=hdTxt()}}ld[k]=true;render()}
-function loadData(){google.script.run.withSuccessHandler(d=>{apply('fin',d.fin);apply('ord',d.ord);apply('non',d.non||[])}).withFailureHandler(e=>msg('Data tidak bisa dimuat: '+((e&&e.message)||e)+'. Coba muat ulang halaman ini.')).aglGetData()}
+function loadData(){google.script.run.withSuccessHandler(d=>{apply('fin',d.fin);apply('ord',d.ord);apply('non',d.non||[]);window.aglSplashDone&&aglSplashDone()}).withFailureHandler(e=>{window.aglSplashFail&&aglSplashFail('Data tidak bisa dimuat: '+((e&&e.message)||e));msg('Data tidak bisa dimuat: '+((e&&e.message)||e)+'. Coba muat ulang halaman ini.')}).aglGetData()}
 $('pt').textContent=hdTxt();render();loadData();setInterval(loadData,60000);
 </script>
 <script>
