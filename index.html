@@ -173,7 +173,9 @@ const num=s=>Number(String(s==null?'':s).replace(/[^\d-]/g,''))||0;
 const cap=s=>s?s[0].toUpperCase()+s.slice(1).toLowerCase():'';
 const ik=s=>+s.replace(/-/g,''),lab=s=>{const a=s.split('-');return a[2]+' '+SH[a[1]-1]+' '+a[0]};
 const T=new Date();
-let P={s:'2026-10-02',e:iso(T)},uP=false,sortP={k:'no',dir:1},sortF=-1,FIN=[],ORD=[],NON=[],ld={fin:false,ord:false,non:false},sig={},mcp=null,qs='',lim=100;
+let P={s:'2026-10-02',e:iso(T)},uP=false,sortP={k:'no',dir:1},sortF=-1,FIN=[],ORD=[],NON=[],ld={fin:false,ord:false,non:false},sig={},mcp=null,qs='',lim=100,HAS_MEJA=false;
+const SERVER_SIAP_MEJA=false; // ubah ke true SETELAH Edit.gs & script upload nota ikut diperbarui untuk kolom No Meja
+
 const inP=x=>x.d.k>=ik(P.s)&&x.d.k<=ik(P.e);
 let CMP=false,tgt='A',P2={s:'',e:''},MV='d',MM='t';
 const inR=(x,r)=>x.d.k>=ik(r.s)&&x.d.k<=ik(r.e);
@@ -186,7 +188,10 @@ function rows(res){if(Array.isArray(res))return res;let p=res&&res.payload;if(ty
   if(!p&&res&&res.content&&res.content[0]){try{p=JSON.parse(res.content[0].text)}catch(e){}}return(p&&p.values)||[]}
 function setFin(v){FIN=v.slice(1).map((r,i)=>{const d=pd(r[0]);if(!d)return null;const x={i,row:i+2,raw:r,d,cs:num(r[1]),ce:num(r[2]),cash:num(r[3]),qris:num(r[4]),gf:num(r[5]),gr:num(r[6]),note:r[8]||''};x.tot=num(r[7])||x.cash+x.qris+x.gf+x.gr;return x}).filter(Boolean)}
 function setOrd(v){ORD=parseOrd(v)}function setNon(v){NON=parseOrd(v)}
-function parseOrd(v){let h=v.findIndex(r=>r&&r[0]==='No.');return v.slice(h<0?1:h+1).map((r,i)=>{const d=pd(r[1]);if(!d)return null;const x={i,row:(h<0?1:h+1)+i+1,raw:r,d,no:r[0]||'',hari:cap((r[2]||'').trim()),q:num(r[3]),code:r[4]||'-',type:(r[5]&&r[5]!=='-')?r[5]:'Tidak dicatat',note:r[6]||'',tot:num(r[7]),cat:r[8]||''};x.h=[d.t,x.hari,x.code,x.type,x.note,x.cat].join(' ').toLowerCase();return x}).filter(Boolean)}
+function colMap(hr){const m={no:0,tgl:1,hari:2,q:3,code:4,type:5,meja:-1,note:6,tot:7,cat:8};if(!hr)return m;
+ const g=(k,re)=>{const i=hr.findIndex(c=>re.test(String(c||'').trim().toLowerCase()));if(i>=0)m[k]=i};
+ g('no',/^no\.?$/);g('tgl',/^tanggal/);g('hari',/^hari/);g('q',/^qty/);g('code',/^kode/);g('type',/^tipe/);g('meja',/^(no\.?\s*)?meja/);g('note',/^keterangan/);g('tot',/^total/);g('cat',/^catatan/);return m}
+function parseOrd(v){let h=v.findIndex(r=>r&&r[0]==='No.');const c=colMap(h<0?null:v[h]);if(c.meja>=0)HAS_MEJA=true;return v.slice(h<0?1:h+1).map((r,i)=>{const d=pd(r[c.tgl]);if(!d)return null;const x={i,row:(h<0?1:h+1)+i+1,raw:r,d,no:r[c.no]||'',hari:cap((r[c.hari]||'').trim()),q:num(r[c.q]),code:r[c.code]||'-',type:(r[c.type]&&r[c.type]!=='-')?r[c.type]:'Tidak dicatat',meja:c.meja>=0?(r[c.meja]||''):'',note:r[c.note]||'',tot:num(r[c.tot]),cat:r[c.cat]||''};x.h=[d.t,x.hari,x.code,x.type,x.meja,x.note,x.cat].join(' ').toLowerCase();return x}).filter(Boolean)}
 
 const kpi=(l,v,n,c)=>`<div class="card kpi"><div class="l">${l}</div><div class="v ${c||''}">${v}</div>${n?`<div class="n">${n}</div>`:''}</div>`;
 const niceMax=m=>{const p=Math.pow(10,Math.floor(Math.log10(m)));return Math.ceil(m/p*2)/2*p};
@@ -270,11 +275,11 @@ function pgPes(){
   const O=ORD.filter(inP),q=O.reduce((a,o)=>a+o.q,0),dy=new Set(O.map(o=>o.d.k)).size;
   return`<h1>Detail Pesanan</h1>${pesTabs()}${TAB==='non'?'':CMP?cHead()+`<div class="grid kp k2">${cKpi('Total Porsi',stat(P).por,stat(P2).por,nf)+cKpi('Avg. Porsi per Hari',stat(P).ap,stat(P2).ap,nf)}</div><div class="mu" style="font-size:12px;margin:-4px 0 10px">Daftar di bawah mengikuti Periode A.</div>`:`<div class="grid kp k2">${kpi('Total Porsi',nf(q))+kpi('Avg. Porsi per Hari',dy?Math.floor(q/dy).toLocaleString('id-ID'):'-')}</div>`}
 <div class="card">${edBar()}<input type="search" id="qs" placeholder="Cari menu, tipe, keterangan, hari…" value="${esc(qs)}"><div class="mu" id="pcnt" style="margin:8px 0;font-size:12px"></div>
-<div class="scroll tall"><table><thead id="phead"><tr><th class="sb" data-k="no">No.<span id="ar-no"></span></th><th class="sb" data-k="date">Tanggal<span id="ar-date"></span></th><th>Hari</th><th class="r">Qty</th><th>Kode Menu</th><th>Tipe Pesanan</th><th>Keterangan Tambahan</th><th class="r">Total (Rp)</th><th>Catatan</th></tr></thead><tbody id="prow"></tbody></table></div>
+<div class="scroll tall"><table><thead id="phead"><tr><th class="sb" data-k="no">No.<span id="ar-no"></span></th><th class="sb" data-k="date">Tanggal<span id="ar-date"></span></th><th>Hari</th><th class="r">Qty</th><th>Kode Menu</th><th>Tipe Pesanan</th><th>No Meja</th><th>Keterangan Tambahan</th><th class="r">Total (Rp)</th><th>Catatan</th></tr></thead><tbody id="prow"></tbody></table></div>
 <div style="text-align:center;margin-top:10px"><button id="more" type="button">Tampilkan lebih banyak</button></div></div>`}
 function pesRows(){const q=qs.trim().toLowerCase(),L=(TAB==='non'?NON:ORD).filter(inP).filter(o=>!q||o.h.includes(q)).sort((a,b)=>sortP.dir*(sortP.k==='no'?num(a.no)-num(b.no)||a.i-b.i:a.d.k-b.d.k||a.i-b.i));
   ['no','date'].forEach(k=>{$('ar-'+k).textContent=sortP.k===k?(sortP.dir>0?' ▲':' ▼'):''});
-  $('prow').innerHTML=L.slice(0,lim).map(o=>`<tr${eAttr(o)}><td>${eMark()}${esc(o.no)}</td><td>${o.d.t}</td><td>${esc(o.hari)}</td><td class="r">${o.q}</td><td>${esc(o.code)}</td><td>${esc(o.type)}</td><td class="note">${esc(o.note)}</td><td class="r">${nf(o.tot)}</td><td class="note">${esc(o.cat)}</td></tr>`).join('')||'<tr><td colspan="9" class="empty">Tidak ada pesanan.</td></tr>';
+  $('prow').innerHTML=L.slice(0,lim).map(o=>`<tr${eAttr(o)}><td>${eMark()}${esc(o.no)}</td><td>${o.d.t}</td><td>${esc(o.hari)}</td><td class="r">${o.q}</td><td>${esc(o.code)}</td><td>${esc(o.type)}</td><td>${esc(o.meja)}</td><td class="note">${esc(o.note)}</td><td class="r">${nf(o.tot)}</td><td class="note">${esc(o.cat)}</td></tr>`).join('')||'<tr><td colspan="10" class="empty">Tidak ada pesanan.</td></tr>';
   $('pcnt').textContent='Menampilkan '+Math.min(lim,L.length)+' dari '+L.length+' baris';$('more').style.display=L.length>lim?'':'none'}
 
 let CS={p:'',o:''},projOpen=false,nettOpen=false;
@@ -388,13 +393,13 @@ function upRun(){if(!UP.tgl){UP.msg='Pilih tanggal penjualan.';return upDraw()}U
   upCall('aglUploadEkstrak',[UP.pin,lab(UP.tgl),UP.fs.map(x=>({data:upB64(x),waktu:x.f.lastModified}))],r=>{UP.busy=false;
     if(!r.ok){if(r.kode==='pin'){UP.pin='';UP.st='pin'}else UP.fail=true;UP.msg=r.pesan;return upDraw()}
     UP.fail=false;UP.dr=r;UP.hs=r.hs;UP.msg='';UP.dup=false;UP.st='review';upDraw()})}
-function upSave(timpa){const r=UP.dr;UP.busy=true;UP.msg='';upDraw();
+function upSave(timpa){const r=UP.dr;if(HAS_MEJA&&!SERVER_SIAP_MEJA){UP.msg='Simpan otomatis dinonaktifkan sementara karena kolom No Meja baru ditambahkan di Sheet dan script server belum diperbarui (data bisa tertulis ke kolom yang salah). Gunakan tombol salin lalu tempel manual ke Sheet.';return upDraw()}UP.busy=true;UP.msg='';upDraw();
   upCall('aglUploadSimpan',[UP.pin,{tanggal:r.tanggal,items:r.items,finance:r.finance.map(f=>({tgl:f.tgl,cashStart:f.cashStart,cashEnd:f.cashEnd,qris:f.qris,grab:f.grab})),timpa:!!timpa}],s=>{UP.busy=false;
     if(!s.ok){if(s.kode==='pin'){UP.pin='';UP.st='pin'}UP.dup=s.kode==='duplikat';UP.msg=s.pesan;return upDraw()}
     UP.dup=false;UP.ok={ringkas:s.ayam+' baris Detail Pesanan dan '+s.non+' baris Non-Ayam disimpan.',lewat:s.lewat};UP.st='selesai';UP.ars='Mengarsipkan foto…';upDraw();loadData();
     upCall('aglUploadArsip',[UP.pin,r.tanggal,UP.fs.map((x,i)=>({data:upB64(x),jenis:r.jenis[i]}))],a=>{UP.ars=a.ok?'Foto diarsipkan di folder Nota AGL Selesai.':'Arsip foto gagal ('+a.pesan+'). Data sudah tersimpan.';upDraw()})})}
 function upCopy(w){const r=UP.dr,h=UP.hs,v=x=>x==null?'':x;
-  const bl=L=>r.manual?L.map(x=>['',...x.slice(1)]):L,rows=w==='a'?bl(h.ayam):w==='n'?bl(h.non):r.finance.map(f=>{const ca=f.cashStart==null||f.cashEnd==null?'':f.cashEnd-f.cashStart;return[f.tgl,v(f.cashStart),v(f.cashEnd),ca,v(f.qris),0,v(f.grab),(ca===''||f.qris==null||f.grab==null)?'':ca+f.qris+f.grab]});
+  const bl=L=>(r.manual?L.map(x=>['',...x.slice(1)]):L).map(x=>[...x.slice(0,6),'',...x.slice(6)]),rows=w==='a'?bl(h.ayam):w==='n'?bl(h.non):r.finance.map(f=>{const ca=f.cashStart==null||f.cashEnd==null?'':f.cashEnd-f.cashStart;return[f.tgl,v(f.cashStart),v(f.cashEnd),ca,v(f.qris),0,v(f.grab),(ca===''||f.qris==null||f.grab==null)?'':ca+f.qris+f.grab]});
   const t=document.createElement('textarea');t.value=rows.map(x=>x.join('\t')).join('\n');document.body.appendChild(t);t.select();let ok=false;try{ok=document.execCommand('copy')}catch(e){}t.remove();
   UP.msg=ok?'Tersalin. Tempel di Google Sheet.':'Gagal menyalin.';upDraw()}
 $('app').addEventListener('click',e=>{const t=e.target.closest('[data-ua]');if(!t)return;const a=t.dataset.ua,i=+t.dataset.ui;
@@ -467,6 +472,7 @@ function pinGo(){
 
 /* form */
 function openForm(aksi,row){
+ if(jn()!=='fin'&&HAS_MEJA&&!SERVER_SIAP_MEJA){toast('Ubah/tambah baris Pesanan dinonaktifkan sementara: kolom No Meja baru ditambahkan dan Edit.gs belum diperbarui.');return}
  const j=jn(),F=FLD[j],x=aksi==='ubah'?(j==='fin'?FIN:j==='non'?NON:ORD).find(o=>o.row===row):null;
  if(aksi==='ubah'&&!x)return;
  const asli=Array.from({length:9},(_,c)=>x?String(x.raw[c]==null?'':x.raw[c]):'');
